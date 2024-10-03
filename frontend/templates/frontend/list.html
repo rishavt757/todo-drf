@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>TO DO</title>
+
+	<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css" integrity="sha384-Vkoo8x4CGsO3+Hhxv8T/Q5PaXtkKtu6ug5TOeNV6gBiFeWPGFN9MuhOf23Q9Ifjh" crossorigin="anonymous">
+
+	<link href="https://fonts.googleapis.com/css?family=Montserrat&display=swap" rel="stylesheet">
+
+	
+    <style>
+        body {
+			background: linear-gradient(90deg, rgba(54, 217, 182, 1) 0%, rgba(32, 152, 126, 1) 43%, rgba(0, 212, 255, 1) 100%);
+			font-family: 'Montserrat', sans-serif;
+			color: #333;
+			margin: 0;
+			padding: 0;
+		}
+		
+		h1, h2, h3, h4, h5, p, span {
+			font-family: 'Montserrat', sans-serif;
+		}
+		
+		#task-container {
+			max-width: 600px;
+			margin: 100px auto;
+			padding: 20px;
+			background-color: #ffffff;
+			border-radius: 10px;
+			box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
+		}
+		
+		#form-wrapper {
+			border-bottom: 2px solid #e9e9e9;
+			padding: 30px 20px;
+		}
+		
+		#title {
+			border-radius: 5px;
+			border: 1px solid #e0e0e0;
+			transition: border-color 0.3s, box-shadow 0.3s;
+			padding: 10px;
+		}
+		
+		#title:focus {
+			border-color: #36d9b6;
+			box-shadow: 0 0 5px rgba(54, 217, 182, 0.5);
+		}
+		
+		#submit {
+			background-color: #36d9b6;
+			border: none;
+			color: #fff;
+			border-radius: 5px;
+			padding: 10px 15px;
+			transition: background-color 0.3s, transform 0.2s;
+			font-weight: bold;
+		}
+		
+		#submit:hover {
+			background-color: #2da98a;
+			transform: translateY(-2px);
+		}
+		
+		.flex-wrapper {
+			display: flex;
+			align-items: center;
+		}
+		
+		.task-wrapper {
+			margin: 5px 0;
+			padding: 15px;
+			cursor: pointer;
+			border: 1px solid #e9e9e9;
+			border-radius: 5px;
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			transition: background-color 0.3s, box-shadow 0.3s;
+		}
+		
+		.task-wrapper:hover {
+			background-color: #f9f9f9;
+			box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+		}
+		
+		.edit, .delete {
+			border: none;
+			border-radius: 5px;
+			padding: 8px 12px;
+			margin-left: 5px;
+			cursor: pointer;
+			transition: background-color 0.3s, transform 0.2s;
+		}
+		
+		.edit {
+			background-color: #007bff;
+			color: white;
+		}
+		
+		.delete {
+			background-color: #dc3545;
+			color: white;
+		}
+		
+		.edit:hover {
+			background-color: #0056b3;
+			transform: translateY(-2px);
+		}
+		
+		.delete:hover {
+			background-color: #c82333;
+			transform: translateY(-2px);
+		}
+		
+		.title {
+			flex: 7;
+			font-weight: 500;
+			word-wrap: break-word;
+		}
+		
+		.strike {
+			text-decoration: line-through;
+			color: #999;
+		}
+		
+		@media (max-width: 600px) {
+			#task-container {
+				width: 90%;
+				margin: 50px auto;
+			}
+		
+			#form-wrapper {
+				padding: 20px;
+			}
+		
+			.flex-wrapper {
+				flex-direction: column;
+				align-items: stretch;
+			}
+		
+			.flex-wrapper > div {
+				margin-bottom: 10px;
+			}
+		}		
+    </style>
+
+</head>
+<body>
+	<div class="container">
+
+		<div id="task-container">
+			<div id="form-wrapper">
+				<form id="form">
+					<div class="flex-wrapper">
+						<div style="flex: 6">
+							<input id="title" class="form-control" type="text" name="title" placeholder="Add task">
+						</div>
+						<div style="flex: 1">
+							<input id="submit" class="btn" type="submit" >
+						</div>
+					</div>
+				</form>
+			</div>
+
+			<div id="list-wrapper">
+			
+			</div>	
+		</div>
+
+	</div>
+
+	<script type="text/javascript">
+		/*
+			KEY COMPONENTS:
+			"activeItem" = null until an edit button is clicked. Will contain object of item we are editing
+			"list_snapshot" = Will contain previous state of list. Used for removing extra rows on list update
+			
+			PROCESS:
+			1 - Fetch Data and build rows "buildList()"
+			2 - Create Item on form submit
+			3 - Edit Item click - Prefill form and change submit URL
+			4 - Delete Item - Send item id to delete URL
+			5 - Cross out completed task - Event handle updated item
+
+			NOTES:
+			-- Add event handlers to "edit", "delete", "title"
+			-- Render with strike through items completed
+			-- Remove extra data on re-render
+			-- CSRF Token
+		*/
+
+		function getCookie(name) {
+		    var cookieValue = null;
+		    if (document.cookie && document.cookie !== '') {
+		        var cookies = document.cookie.split(';');
+		        for (var i = 0; i < cookies.length; i++) {
+		            var cookie = cookies[i].trim();
+		            // Does this cookie string begin with the name we want?
+		            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+		                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+		                break;
+		            }
+		        }
+		    }
+		    return cookieValue;
+		}
+		var csrftoken = getCookie('csrftoken');
+
+		var activeItem = null
+		var list_snapshot = []
+
+		buildList()
+
+		function buildList(){
+			var wrapper = document.getElementById('list-wrapper')
+			//wrapper.innerHTML = ''
+
+
+
+			var url = 'http://127.0.0.1:8000/api/task-list/'
+
+			fetch(url)
+			.then((resp) => resp.json())
+			.then(function(data){
+				console.log('Data:', data)
+
+				var list = data
+				for (var i in list){
+
+
+					try{
+						document.getElementById(`data-row-${i}`).remove()
+					}catch(err){
+
+					}
+			
+
+
+					var title = `<span class="title">${list[i].title}</span>`
+					if (list[i].completed == true){
+						title = `<strike class="title">${list[i].title}</strike>`
+					}
+
+					var item = `
+						<div id="data-row-${i}" class="task-wrapper flex-wrapper">
+							<div style="flex:7">
+								${title}
+							</div>
+							<div style="flex:1">
+								<button class="btn btn-sm btn-outline-info edit">Edit </button>
+							</div>
+							<div style="flex:1">
+								<button class="btn btn-sm btn-outline-dark delete">Delete</button>
+							</div>
+						</div>
+
+					`
+					wrapper.innerHTML += item
+	
+				}
+
+				if (list_snapshot.length > list.length){
+					for (var i = list.length; i < list_snapshot.length; i++){
+						document.getElementById(`data-row-${i}`).remove()
+					}
+				}
+
+				list_snapshot = list
+
+
+				for (var i in list){
+					var editBtn = document.getElementsByClassName('edit')[i]
+					var deleteBtn = document.getElementsByClassName('delete')[i]
+					var title = document.getElementsByClassName('title')[i]
+
+					// editBtn.addEventListener('click', (function(item){
+					// 	return function(){
+					// 		editItem(item)
+					// 	}
+					// })(list[i]))
+
+					//Immediatly Invoked Function (IIF) + Closure for saving current loop item in memory
+					editBtn.addEventListener('click', (() => {
+
+						let item = list[i]
+						return () => {
+							editItem(item)
+						}
+					})())
+
+
+					deleteBtn.addEventListener('click', (function(item){
+						return function(){
+							deleteItem(item)
+						}
+					})(list[i]))
+
+
+
+					
+					title.addEventListener('click', (function(item){
+						return function(){
+							strikeUnstrike(item)
+						}
+					})(list[i]))
+
+
+				}
+
+
+			})
+		}
+
+
+		var form = document.getElementById('form-wrapper')
+		form.addEventListener('submit', function(e){
+			e.preventDefault()
+			console.log('Form submitted')
+			var url = 'http://127.0.0.1:8000/api/task-create/'
+			if (activeItem != null){
+				var url = `http://127.0.0.1:8000/api/task-update/${activeItem.id}/`
+				activeItem = null
+			}
+
+
+
+			var title = document.getElementById('title').value
+			fetch(url, {
+				method:'POST',
+				headers:{
+					'Content-type':'application/json',
+					'X-CSRFToken':csrftoken,
+				},
+				body:JSON.stringify({'title':title})
+			}
+			).then(function(response){
+				buildList()
+				document.getElementById('form').reset()
+			})
+		})
+
+
+
+
+		function editItem(item){
+			console.log('Item clicked:', item)
+			activeItem = item
+			document.getElementById('title').value = activeItem.title
+		}
+
+
+		function deleteItem(item){
+			console.log('Delete clicked')
+			fetch(`http://127.0.0.1:8000/api/task-delete/${item.id}/`, {
+				method:'DELETE', 
+				headers:{
+					'Content-type':'application/json',
+					'X-CSRFToken':csrftoken,
+				}
+			}).then((response) => {
+				buildList()
+			})
+		}
+
+		function strikeUnstrike(item){
+			console.log('Strike clicked')
+
+			item.completed = !item.completed
+			fetch(`http://127.0.0.1:8000/api/task-update/${item.id}/`, {
+				method:'POST',
+				headers:{
+					'Content-type':'application/json',
+					'X-CSRFToken':csrftoken,
+				},
+				body:JSON.stringify({'title':item.title, 'completed':item.completed})
+			}).then((response) => {
+				buildList()
+			})
+		}
+
+
+	</script>
+
+</body>
+</html>

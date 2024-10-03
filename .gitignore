@@ -1,0 +1,8 @@
+.DS_Store
+.project
+*.mp4
+*.txt
+*.png
+*.pyc
+*.jpg
+db.sqlite3
